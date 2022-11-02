@@ -55,7 +55,7 @@ typedef struct {
 
 	struct gs_host_frame *from_host_buf;
 
-	can_data_t *channels[NUM_CAN_CHANNEL];
+	CAN_HANDLE_TYPEDEF *channels[NUM_CAN_CHANNEL];
 
 	led_data_t *leds;
 	bool dfu_detach_requested;
@@ -65,6 +65,8 @@ typedef struct {
 
 	bool pad_pkts_to_max_pkt_size;
 } USBD_GS_CAN_HandleTypeDef __attribute__ ((aligned (4)));
+
+USBD_GS_CAN_HandleTypeDef hcan_mem = {0};
 
 static volatile bool is_usb_suspend_cb = false;
 
@@ -80,179 +82,179 @@ static uint8_t USBD_GS_CAN_SOF(struct _USBD_HandleTypeDef *pdev);
 
 /* CAN interface class callbacks structure */
 USBD_ClassTypeDef USBD_GS_CAN = {
-	.Init = USBD_GS_CAN_Start,
-	.DeInit = USBD_GS_CAN_DeInit,
-	.Setup = USBD_GS_CAN_Setup,
-	.EP0_RxReady = USBD_GS_CAN_EP0_RxReady,
-	.DataIn = USBD_GS_CAN_DataIn,
-	.DataOut = USBD_GS_CAN_DataOut,
-	.SOF = USBD_GS_CAN_SOF,
-	.GetHSConfigDescriptor = USBD_GS_CAN_GetCfgDesc,
-	.GetFSConfigDescriptor = USBD_GS_CAN_GetCfgDesc,
-	.GetOtherSpeedConfigDescriptor = USBD_GS_CAN_GetCfgDesc,
-	.GetUsrStrDescriptor = USBD_GS_CAN_GetStrDesc,
+  .Init = USBD_GS_CAN_Start,
+  .DeInit = USBD_GS_CAN_DeInit,
+  .Setup = USBD_GS_CAN_Setup,
+  .EP0_RxReady = USBD_GS_CAN_EP0_RxReady,
+  .DataIn = USBD_GS_CAN_DataIn,
+  .DataOut = USBD_GS_CAN_DataOut,
+  .SOF = USBD_GS_CAN_SOF,
+  .GetHSConfigDescriptor = USBD_GS_CAN_GetCfgDesc,
+  .GetFSConfigDescriptor = USBD_GS_CAN_GetCfgDesc,
+  .GetOtherSpeedConfigDescriptor = USBD_GS_CAN_GetCfgDesc,
+  .GetUsrStrDescriptor = USBD_GS_CAN_GetStrDesc,
 };
 
 
 /* Configuration Descriptor */
 static const uint8_t USBD_GS_CAN_CfgDesc[USB_CAN_CONFIG_DESC_SIZ] =
 {
-	/*---------------------------------------------------------------------------*/
-	/* Configuration Descriptor */
-	0x09,                             /* bLength */
-	USB_DESC_TYPE_CONFIGURATION,      /* bDescriptorType */
-	USB_CAN_CONFIG_DESC_SIZ,          /* wTotalLength */
-	0x00,
-	0x02,                             /* bNumInterfaces */
-	0x01,                             /* bConfigurationValue */
-	USBD_IDX_CONFIG_STR,              /* iConfiguration */
-	0x80,                             /* bmAttributes */
-	0x4B,                             /* MaxPower 150 mA */
-	/*---------------------------------------------------------------------------*/
+  /*---------------------------------------------------------------------------*/
+  /* Configuration Descriptor */
+  0x09,                             /* bLength */
+  USB_DESC_TYPE_CONFIGURATION,      /* bDescriptorType */
+  USB_CAN_CONFIG_DESC_SIZ,          /* wTotalLength */
+  0x00,
+  0x02,                             /* bNumInterfaces */
+  0x01,                             /* bConfigurationValue */
+  USBD_IDX_CONFIG_STR,              /* iConfiguration */
+  0x80,                             /* bmAttributes */
+  0x4B,                             /* MaxPower 150 mA */
+  /*---------------------------------------------------------------------------*/
 
-	/*---------------------------------------------------------------------------*/
-	/* GS_USB Interface Descriptor */
-	0x09,                             /* bLength */
-	USB_DESC_TYPE_INTERFACE,          /* bDescriptorType */
-	0x00,                             /* bInterfaceNumber */
-	0x00,                             /* bAlternateSetting */
-	0x02,                             /* bNumEndpoints */
-	0xFF,                             /* bInterfaceClass: Vendor Specific*/
-	0xFF,                             /* bInterfaceSubClass: Vendor Specific */
-	0xFF,                             /* bInterfaceProtocol: Vendor Specific */
-	0x00,                             /* iInterface */
-	/*---------------------------------------------------------------------------*/
+  /*---------------------------------------------------------------------------*/
+  /* GS_USB Interface Descriptor */
+  0x09,                             /* bLength */
+  USB_DESC_TYPE_INTERFACE,          /* bDescriptorType */
+  0x00,                             /* bInterfaceNumber */
+  0x00,                             /* bAlternateSetting */
+  0x02,                             /* bNumEndpoints */
+  0xFF,                             /* bInterfaceClass: Vendor Specific*/
+  0xFF,                             /* bInterfaceSubClass: Vendor Specific */
+  0xFF,                             /* bInterfaceProtocol: Vendor Specific */
+  0x00,                             /* iInterface */
+  /*---------------------------------------------------------------------------*/
 
-	/*---------------------------------------------------------------------------*/
-	/* EP1 descriptor */
-	0x07,                             /* bLength */
-	USB_DESC_TYPE_ENDPOINT,           /* bDescriptorType */
-	GSUSB_ENDPOINT_IN,                /* bEndpointAddress */
-	0x02,                             /* bmAttributes: bulk */
-	LOBYTE(CAN_DATA_MAX_PACKET_SIZE), /* wMaxPacketSize */
-	HIBYTE(CAN_DATA_MAX_PACKET_SIZE),
-	0x00,                             /* bInterval: */
-	/*---------------------------------------------------------------------------*/
+  /*---------------------------------------------------------------------------*/
+  /* EP1 descriptor */
+  0x07,                             /* bLength */
+  USB_DESC_TYPE_ENDPOINT,           /* bDescriptorType */
+  GSUSB_ENDPOINT_IN,                /* bEndpointAddress */
+  0x02,                             /* bmAttributes: bulk */
+  LOBYTE(CAN_DATA_MAX_PACKET_SIZE), /* wMaxPacketSize */
+  HIBYTE(CAN_DATA_MAX_PACKET_SIZE),
+  0x00,                             /* bInterval: */
+  /*---------------------------------------------------------------------------*/
 
-	/*---------------------------------------------------------------------------*/
-	/* EP2 descriptor */
-	0x07,                             /* bLength */
-	USB_DESC_TYPE_ENDPOINT,           /* bDescriptorType */
-	GSUSB_ENDPOINT_OUT,               /* bEndpointAddress */
-	0x02,                             /* bmAttributes: bulk */
-	LOBYTE(CAN_DATA_MAX_PACKET_SIZE), /* wMaxPacketSize */
-	HIBYTE(CAN_DATA_MAX_PACKET_SIZE),
-	0x00,                             /* bInterval: */
-	/*---------------------------------------------------------------------------*/
+  /*---------------------------------------------------------------------------*/
+  /* EP2 descriptor */
+  0x07,                             /* bLength */
+  USB_DESC_TYPE_ENDPOINT,           /* bDescriptorType */
+  GSUSB_ENDPOINT_OUT,               /* bEndpointAddress */
+  0x02,                             /* bmAttributes: bulk */
+  LOBYTE(CAN_DATA_MAX_PACKET_SIZE), /* wMaxPacketSize */
+  HIBYTE(CAN_DATA_MAX_PACKET_SIZE),
+  0x00,                             /* bInterval: */
+  /*---------------------------------------------------------------------------*/
 
-	/*---------------------------------------------------------------------------*/
-	/* DFU Interface Descriptor */
-	/*---------------------------------------------------------------------------*/
-	0x09,                             /* bLength */
-	USB_DESC_TYPE_INTERFACE,          /* bDescriptorType */
-	DFU_INTERFACE_NUM,                /* bInterfaceNumber */
-	0x00,                             /* bAlternateSetting */
-	0x00,                             /* bNumEndpoints */
-	0xFE,                             /* bInterfaceClass: Vendor Specific*/
-	0x01,                             /* bInterfaceSubClass */
-	0x01,                             /* bInterfaceProtocol : Runtime mode */
-	DFU_INTERFACE_STR_INDEX,          /* iInterface */
+  /*---------------------------------------------------------------------------*/
+  /* DFU Interface Descriptor */
+  /*---------------------------------------------------------------------------*/
+  0x09,                             /* bLength */
+  USB_DESC_TYPE_INTERFACE,          /* bDescriptorType */
+  DFU_INTERFACE_NUM,                /* bInterfaceNumber */
+  0x00,                             /* bAlternateSetting */
+  0x00,                             /* bNumEndpoints */
+  0xFE,                             /* bInterfaceClass: Vendor Specific*/
+  0x01,                             /* bInterfaceSubClass */
+  0x01,                             /* bInterfaceProtocol : Runtime mode */
+  DFU_INTERFACE_STR_INDEX,          /* iInterface */
 
-	/*---------------------------------------------------------------------------*/
-	/* Run-Time DFU Functional Descriptor */
-	/*---------------------------------------------------------------------------*/
-	0x09,                             /* bLength */
-	0x21,                             /* bDescriptorType: DFU FUNCTIONAL */
-	0x0B,                             /* bmAttributes: detach, upload, download */
-	0xFF, 0x00,                       /* wDetachTimeOut */
-	0x00, 0x08,                       /* wTransferSize */
-	0x1a, 0x01,                       /* bcdDFUVersion: 1.1a */
+  /*---------------------------------------------------------------------------*/
+  /* Run-Time DFU Functional Descriptor */
+  /*---------------------------------------------------------------------------*/
+  0x09,                             /* bLength */
+  0x21,                             /* bDescriptorType: DFU FUNCTIONAL */
+  0x0B,                             /* bmAttributes: detach, upload, download */
+  0xFF, 0x00,                       /* wDetachTimeOut */
+  0x00, 0x08,                       /* wTransferSize */
+  0x1a, 0x01,                       /* bcdDFUVersion: 1.1a */
 
 };
 
 /* Microsoft OS String Descriptor */
 static const uint8_t USBD_GS_CAN_WINUSB_STR[] =
 {
-	0x12,                    /* length */
-	0x03,                    /* descriptor type == string */
-	0x4D, 0x00, 0x53, 0x00,  /* signature: "MSFT100" */
-	0x46, 0x00, 0x54, 0x00,
-	0x31, 0x00, 0x30, 0x00,
-	0x30, 0x00,
-	USBD_GS_CAN_VENDOR_CODE, /* vendor code */
-	0x00                     /* padding */
+  0x12,                    /* length */
+  0x03,                    /* descriptor type == string */
+  0x4D, 0x00, 0x53, 0x00,  /* signature: "MSFT100" */
+  0x46, 0x00, 0x54, 0x00,
+  0x31, 0x00, 0x30, 0x00,
+  0x30, 0x00,
+  USBD_GS_CAN_VENDOR_CODE, /* vendor code */
+  0x00                     /* padding */
 };
 
 /*  Microsoft Compatible ID Feature Descriptor  */
 static const uint8_t USBD_MS_COMP_ID_FEATURE_DESC[] = {
-	0x40, 0x00, 0x00, 0x00, /* length */
-	0x00, 0x01,             /* version 1.0 */
-	0x04, 0x00,             /* descr index (0x0004) */
-	0x02,                   /* number of sections */
-	0x00, 0x00, 0x00, 0x00, /* reserved */
-	0x00, 0x00, 0x00,
-	0x00,                   /* interface number */
-	0x01,                   /* reserved */
-	0x57, 0x49, 0x4E, 0x55, /* compatible ID ("WINUSB\0\0") */
-	0x53, 0x42, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, /* sub-compatible ID */
-	0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, /* reserved */
-	0x00, 0x00,
-	0x01,                   /* interface number */
-	0x01,                   /* reserved */
-	0x57, 0x49, 0x4E, 0x55, /* compatible ID ("WINUSB\0\0") */
-	0x53, 0x42, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, /* sub-compatible ID */
-	0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, /* reserved */
-	0x00, 0x00
+  0x40, 0x00, 0x00, 0x00, /* length */
+  0x00, 0x01,             /* version 1.0 */
+  0x04, 0x00,             /* descr index (0x0004) */
+  0x02,                   /* number of sections */
+  0x00, 0x00, 0x00, 0x00, /* reserved */
+  0x00, 0x00, 0x00,
+  0x00,                   /* interface number */
+  0x01,                   /* reserved */
+  0x57, 0x49, 0x4E, 0x55, /* compatible ID ("WINUSB\0\0") */
+  0x53, 0x42, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, /* sub-compatible ID */
+  0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, /* reserved */
+  0x00, 0x00,
+  0x01,                   /* interface number */
+  0x01,                   /* reserved */
+  0x57, 0x49, 0x4E, 0x55, /* compatible ID ("WINUSB\0\0") */
+  0x53, 0x42, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, /* sub-compatible ID */
+  0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, /* reserved */
+  0x00, 0x00
 };
 
 /* Microsoft Extended Properties Feature Descriptor */
 static const uint8_t USBD_MS_EXT_PROP_FEATURE_DESC[] = {
-	0x92, 0x00, 0x00, 0x00, /* length */
-	0x00, 0x01,             /* version 1.0 */
-	0x05, 0x00,             /* descr index (0x0005) */
-	0x01, 0x00,             /* number of sections */
-	0x88, 0x00, 0x00, 0x00, /* property section size */
-	0x07, 0x00, 0x00, 0x00, /* property data type 7: Unicode REG_MULTI_SZ */
-	0x2a, 0x00,             /* property name length */
+  0x92, 0x00, 0x00, 0x00, /* length */
+  0x00, 0x01,             /* version 1.0 */
+  0x05, 0x00,             /* descr index (0x0005) */
+  0x01, 0x00,             /* number of sections */
+  0x88, 0x00, 0x00, 0x00, /* property section size */
+  0x07, 0x00, 0x00, 0x00, /* property data type 7: Unicode REG_MULTI_SZ */
+  0x2a, 0x00,             /* property name length */
 
-	0x44, 0x00, 0x65, 0x00, /* property name "DeviceInterfaceGUIDs" */
-	0x76, 0x00, 0x69, 0x00,
-	0x63, 0x00, 0x65, 0x00,
-	0x49, 0x00, 0x6e, 0x00,
-	0x74, 0x00, 0x65, 0x00,
-	0x72, 0x00, 0x66, 0x00,
-	0x61, 0x00, 0x63, 0x00,
-	0x65, 0x00, 0x47, 0x00,
-	0x55, 0x00, 0x49, 0x00,
-	0x44, 0x00, 0x73, 0x00,
-	0x00, 0x00,
+  0x44, 0x00, 0x65, 0x00, /* property name "DeviceInterfaceGUIDs" */
+  0x76, 0x00, 0x69, 0x00,
+  0x63, 0x00, 0x65, 0x00,
+  0x49, 0x00, 0x6e, 0x00,
+  0x74, 0x00, 0x65, 0x00,
+  0x72, 0x00, 0x66, 0x00,
+  0x61, 0x00, 0x63, 0x00,
+  0x65, 0x00, 0x47, 0x00,
+  0x55, 0x00, 0x49, 0x00,
+  0x44, 0x00, 0x73, 0x00,
+  0x00, 0x00,
 
-	0x50, 0x00, 0x00, 0x00, /* property data length */
+  0x50, 0x00, 0x00, 0x00, /* property data length */
 
-	0x7b, 0x00, 0x63, 0x00, /* property name: "{c15b4308-04d3-11e6-b3ea-6057189e6443}\0\0" */
-	0x31, 0x00, 0x35, 0x00,
-	0x62, 0x00, 0x34, 0x00,
-	0x33, 0x00, 0x30, 0x00,
-	0x38, 0x00, 0x2d, 0x00,
-	0x30, 0x00, 0x34, 0x00,
-	0x64, 0x00, 0x33, 0x00,
-	0x2d, 0x00, 0x31, 0x00,
-	0x31, 0x00, 0x65, 0x00,
-	0x36, 0x00, 0x2d, 0x00,
-	0x62, 0x00, 0x33, 0x00,
-	0x65, 0x00, 0x61, 0x00,
-	0x2d, 0x00, 0x36, 0x00,
-	0x30, 0x00, 0x35, 0x00,
-	0x37, 0x00, 0x31, 0x00,
-	0x38, 0x00, 0x39, 0x00,
-	0x65, 0x00, 0x36, 0x00,
-	0x34, 0x00, 0x34, 0x00,
-	0x33, 0x00, 0x7d, 0x00,
-	0x00, 0x00, 0x00, 0x00
+  0x7b, 0x00, 0x63, 0x00, /* property name: "{c15b4308-04d3-11e6-b3ea-6057189e6443}\0\0" */
+  0x31, 0x00, 0x35, 0x00,
+  0x62, 0x00, 0x34, 0x00,
+  0x33, 0x00, 0x30, 0x00,
+  0x38, 0x00, 0x2d, 0x00,
+  0x30, 0x00, 0x34, 0x00,
+  0x64, 0x00, 0x33, 0x00,
+  0x2d, 0x00, 0x31, 0x00,
+  0x31, 0x00, 0x65, 0x00,
+  0x36, 0x00, 0x2d, 0x00,
+  0x62, 0x00, 0x33, 0x00,
+  0x65, 0x00, 0x61, 0x00,
+  0x2d, 0x00, 0x36, 0x00,
+  0x30, 0x00, 0x35, 0x00,
+  0x37, 0x00, 0x31, 0x00,
+  0x38, 0x00, 0x39, 0x00,
+  0x65, 0x00, 0x36, 0x00,
+  0x34, 0x00, 0x34, 0x00,
+  0x33, 0x00, 0x7d, 0x00,
+  0x00, 0x00, 0x00, 0x00
 };
 
 
@@ -261,7 +263,7 @@ static const struct gs_device_config USBD_GS_CAN_dconf = {
 	0, // reserved 1
 	0, // reserved 2
 	0, // reserved 3
-	0, // interface count (0=1, 1=2..)
+	NUM_CAN_CHANNEL-1, // interface count (0=1, 1=2..)
 	2, // software version
 	1  // hardware version
 };
@@ -273,11 +275,14 @@ static const struct gs_device_bt_const USBD_GS_CAN_btconst = {
 	| GS_CAN_FEATURE_HW_TIMESTAMP
 	| GS_CAN_FEATURE_IDENTIFY
 	| GS_CAN_FEATURE_USER_ID
-	| GS_CAN_FEATURE_PAD_PKTS_TO_MAX_PKT_SIZE
+#if defined(CANFD_SUPPORT)
+  | GS_CAN_FEATURE_FD
+  | GS_CAN_FEATURE_BT_CONST_EXT
+#endif
 #ifdef TERM_Pin
 	| GS_CAN_FEATURE_TERMINATION
 #endif
-	,
+	| GS_CAN_FEATURE_PAD_PKTS_TO_MAX_PKT_SIZE,
 	CAN_CLOCK_SPEED, // can timing base clock
 	1, // tseg1 min
 	16, // tseg1 max
@@ -289,6 +294,39 @@ static const struct gs_device_bt_const USBD_GS_CAN_btconst = {
 	1, // brp increment;
 };
 
+static const struct gs_device_bt_const_extended USBD_GS_CAN_btconst_extended = {
+  GS_CAN_FEATURE_LISTEN_ONLY  // supported features
+  | GS_CAN_FEATURE_LOOP_BACK
+  | GS_CAN_FEATURE_HW_TIMESTAMP
+  | GS_CAN_FEATURE_IDENTIFY
+  | GS_CAN_FEATURE_USER_ID
+#if defined(CANFD_SUPPORT)
+  | GS_CAN_FEATURE_FD
+  | GS_CAN_FEATURE_BT_CONST_EXT
+#endif
+#ifdef TERM_Pin
+	| GS_CAN_FEATURE_TERMINATION
+#endif
+  | GS_CAN_FEATURE_PAD_PKTS_TO_MAX_PKT_SIZE,
+  CAN_CLOCK_SPEED, // can timing base clock
+  1, // tseg1 min
+  16, // tseg1 max
+  1, // tseg2 min
+  8, // tseg2 max
+  4, // sjw max
+  1, // brp min
+  1024, //brp_max
+  1, // brp increment;
+
+  1, // dtseg1_min
+  16, // dtseg1_max
+  1, // dtseg2_min
+  8, // dtseg2_max
+  4, // dsjw_max
+  1, // dbrp_min
+  1024, //dbrp_max
+  1, // dbrp_inc;
+};
 /* It's unclear from the documentation, but it appears that the USB library is
  * not safely reentrant. It attempts to signal errors via return values if it is
  * reentered, but that code is not interrupt-safe and the error values are
@@ -302,7 +340,7 @@ uint8_t USBD_GS_CAN_Init(USBD_HandleTypeDef *pdev, queue_t *q_frame_pool, queue_
 {
 	static uint32_t mem[(sizeof(USBD_GS_CAN_HandleTypeDef)/4)+1] = {0}; /* On 32-bit boundary */
 	USBD_GS_CAN_HandleTypeDef *hcan = (USBD_GS_CAN_HandleTypeDef*)&mem;
-
+	
 	assert_basic(hcan);
 
 	hcan->q_frame_pool = q_frame_pool;
@@ -346,7 +384,7 @@ static uint8_t USBD_GS_CAN_SOF(struct _USBD_HandleTypeDef *pdev)
 	return USBD_OK;
 }
 
-void USBD_GS_CAN_SetChannel(USBD_HandleTypeDef *pdev, uint8_t channel, can_data_t* handle) {
+void USBD_GS_CAN_SetChannel(USBD_HandleTypeDef *pdev, uint8_t channel, CAN_HANDLE_TYPEDEF* handle) {
 	USBD_GS_CAN_HandleTypeDef *hcan = (USBD_GS_CAN_HandleTypeDef*) pdev->pClassData;
 
 	assert_basic(hcan);
@@ -361,13 +399,40 @@ static const led_seq_step_t led_identify_seq[] = {
 	{ .state = 0x00, .time_in_10ms = 0 }
 };
 
+CAN_HANDLE_TYPEDEF* USBD_GS_CAN_GetChannelHandle(USBD_HandleTypeDef *pdev, uint8_t channel) {
+  USBD_GS_CAN_HandleTypeDef *hcan = (USBD_GS_CAN_HandleTypeDef*) pdev->pClassData;
+  assert_basic(hcan);
+  assert_basic(channel < NUM_CAN_CHANNEL);
+
+  CAN_HANDLE_TYPEDEF* channel_handle = hcan->channels[channel];
+  assert_basic(channel_handle);
+  return channel_handle;
+}
+
+uint8_t USBD_GS_CAN_GetChannelNumber(USBD_HandleTypeDef *pdev, CAN_HANDLE_TYPEDEF* handle) {
+
+  USBD_GS_CAN_HandleTypeDef *hcan = (USBD_GS_CAN_HandleTypeDef*) pdev->pClassData;
+	assert_basic(hcan);
+  uint8_t channel = 0; //default to first channel since all devices have at least one channel
+
+  for (uint8_t chan_index = 0; chan_index < NUM_CAN_CHANNEL; chan_index++) {
+    if ( hcan->channels[chan_index] == handle) {
+      channel = chan_index;
+      break;
+    }
+  }
+
+  assert_basic(channel < NUM_CAN_CHANNEL);
+  return channel;
+}
+
 static uint8_t USBD_GS_CAN_EP0_RxReady(USBD_HandleTypeDef *pdev) {
 
 	USBD_GS_CAN_HandleTypeDef *hcan = (USBD_GS_CAN_HandleTypeDef*) pdev->pClassData;
 
 	struct gs_device_bittiming *timing;
 	struct gs_device_mode *mode;
-	can_data_t *ch;
+	CAN_HANDLE_TYPEDEF *ch;
 	uint32_t param_u32;
 
 	USBD_SetupReqTypedef *req = &hcan->last_setup_request;
@@ -431,7 +496,8 @@ static uint8_t USBD_GS_CAN_EP0_RxReady(USBD_HandleTypeDef *pdev) {
 					can_enable(ch,
 							   (mode->flags & GS_CAN_MODE_LOOP_BACK) != 0,
 							   (mode->flags & GS_CAN_MODE_LISTEN_ONLY) != 0,
-							   (mode->flags & GS_CAN_MODE_ONE_SHOT) != 0
+							   (mode->flags & GS_CAN_MODE_ONE_SHOT) != 0,
+							   (mode->flags & GS_CAN_MODE_FD) != 0
 					           // triple sampling not supported on bxCAN
 							   );
 
@@ -452,7 +518,18 @@ static uint8_t USBD_GS_CAN_EP0_RxReady(USBD_HandleTypeDef *pdev) {
 					);
 			}
 			break;
-
+		case GS_USB_BREQ_DATA_BITTIMING:
+			timing = (struct gs_device_bittiming*)hcan->ep0_buf;
+			if (req->wValue < NUM_CAN_CHANNEL) {
+				can_set_data_bittiming(
+					hcan->channels[req->wValue],
+					timing->brp,
+					timing->prop_seg + timing->phase_seg1,
+					timing->phase_seg2,
+					timing->sjw
+				);
+			}
+			break;
 		default:
 			break;
 	}
@@ -504,6 +581,7 @@ static uint8_t USBD_GS_CAN_Config_Request(USBD_HandleTypeDef *pdev, USBD_SetupRe
 		case GS_USB_BREQ_HOST_FORMAT:
 		case GS_USB_BREQ_MODE:
 		case GS_USB_BREQ_BITTIMING:
+		case GS_USB_BREQ_DATA_BITTIMING:
 		case GS_USB_BREQ_IDENTIFY:
 		case GS_USB_BREQ_SET_USER_ID:
 			hcan->last_setup_request = *req;
@@ -532,7 +610,10 @@ static uint8_t USBD_GS_CAN_Config_Request(USBD_HandleTypeDef *pdev, USBD_SetupRe
 			memcpy(hcan->ep0_buf, &USBD_GS_CAN_btconst, sizeof(USBD_GS_CAN_btconst));
 			USBD_CtlSendData(pdev, hcan->ep0_buf, req->wLength);
 			break;
-
+		case GS_USB_BREQ_BT_CONST_EXT:
+			memcpy(hcan->ep0_buf, &USBD_GS_CAN_btconst_extended, sizeof(USBD_GS_CAN_btconst_extended));
+			USBD_CtlSendData(pdev, hcan->ep0_buf, req->wLength);
+			break;
 		case GS_USB_BREQ_TIMESTAMP:
 			memcpy(hcan->ep0_buf, &hcan->sof_timestamp_us, sizeof(hcan->sof_timestamp_us));
 			USBD_CtlSendData(pdev, hcan->ep0_buf, sizeof(hcan->sof_timestamp_us));
@@ -644,7 +725,7 @@ static uint8_t USBD_GS_CAN_DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum) {
 	USBD_GS_CAN_HandleTypeDef *hcan = (USBD_GS_CAN_HandleTypeDef*)pdev->pClassData;
 
 	uint32_t rxlen = USBD_LL_GetRxDataSize(pdev, epnum);
-	if (rxlen < (sizeof(struct gs_host_frame)-4)) {
+	if (rxlen < (sizeof(struct gs_host_frame_classic_can)-4)) {
 		// Invalid frame length, just ignore it and receive into the same buffer
 		// again next time.
 		USBD_GS_CAN_PrepareReceive(pdev);
@@ -708,10 +789,17 @@ uint8_t USBD_GS_CAN_Transmit(USBD_HandleTypeDef *pdev, uint8_t *buf, uint16_t le
 
 uint8_t USBD_GS_CAN_SendFrame(USBD_HandleTypeDef *pdev, struct gs_host_frame *frame)
 {
-	uint8_t buf[CAN_DATA_MAX_PACKET_SIZE],*send_addr;
+	uint8_t buf[sizeof(struct gs_host_frame)],*send_addr;
 
 	USBD_GS_CAN_HandleTypeDef *hcan = (USBD_GS_CAN_HandleTypeDef*)pdev->pClassData;
-	size_t len = sizeof(struct gs_host_frame);
+	size_t len = 0;
+
+  if (frame->flags & GS_CAN_FLAG_FD) {
+    len = sizeof(struct gs_host_frame);
+  }
+  else {
+    len = sizeof(struct gs_host_frame_classic_can);
+  }
 
 	if (!hcan->timestamps_enabled) {
 		len -= 4;

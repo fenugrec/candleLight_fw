@@ -50,8 +50,17 @@ static void SystemClock_Config(void);
 static bool send_to_host_or_enqueue(struct gs_host_frame *frame);
 static void send_to_host(void);
 
-static can_data_t hCAN = {0};
-static USBD_HandleTypeDef hUSB = {0};
+/* Create handles for all the possible CAN channels */
+static CAN_HANDLE_TYPEDEF hCAN = {0};
+#if defined(CAN_INTERFACE2)
+	static CAN_HANDLE_TYPEDEF hCAN2 = {0};
+#endif
+#if defined(CAN_INTERFACE3)
+	static CAN_HANDLE_TYPEDEF hCAN3 = {0};
+#endif
+
+/* hUSB has global scope as it is used in can.c */
+USBD_HandleTypeDef hUSB = {0};
 static led_data_t hLED = {0};
 
 static queue_t *q_frame_pool = NULL;
@@ -65,7 +74,7 @@ int main(void)
 	HAL_Init();
 	SystemClock_Config();
 
-	flash_load();
+    flash_load();
 
 	gpio_init();
 
@@ -82,9 +91,17 @@ int main(void)
 	led_set_mode(&hLED, led_mode_off);
 	timer_init();
 
+	/* Initialize all of the possible CAN interfaces */
 	can_init(&hCAN, CAN_INTERFACE);
 	can_disable(&hCAN);
-
+#if defined(CAN_INTERFACE2)
+	can_init(&hCAN2, CAN_INTERFACE2);
+	can_disable(&hCAN2);
+#endif
+#if defined(CAN_INTERFACE3)
+	can_init(&hCAN3, CAN_INTERFACE3);
+	can_disable(&hCAN3);
+#endif
 
 	q_frame_pool = queue_create(CAN_QUEUE_SIZE);
 	q_from_host  = queue_create(CAN_QUEUE_SIZE);
@@ -102,6 +119,12 @@ int main(void)
 	USBD_RegisterClass(&hUSB, &USBD_GS_CAN);
 	USBD_GS_CAN_Init(&hUSB, q_frame_pool, q_from_host, &hLED);
 	USBD_GS_CAN_SetChannel(&hUSB, 0, &hCAN);
+#if defined(CAN_INTERFACE2)
+	USBD_GS_CAN_SetChannel(&hUSB, 1, &hCAN2);
+#endif
+#if defined(CAN_INTERFACE3)
+	USBD_GS_CAN_SetChannel(&hUSB, 2, &hCAN3);
+#endif
 	USBD_Start(&hUSB);
 
 #ifdef CAN_S_GPIO_Port
@@ -110,9 +133,12 @@ int main(void)
 
 	while (1) {
 		struct gs_host_frame *frame = queue_pop_front(q_from_host);
+
 		if (frame != 0) { // send can message from host
-			if (can_send(&hCAN, frame)) {
+			if (can_send(USBD_GS_CAN_GetChannelHandle(&hUSB,frame->channel), frame)) {
 				// Echo sent frame back to host
+				/* the echo_id member remains unchanged as the host checks the 
+				   matching value in the reponse */
 				frame->flags = 0x0;
 				frame->reserved = 0x0;
 				frame->timestamp_us = timer_get();
@@ -127,46 +153,47 @@ int main(void)
 		if (USBD_GS_CAN_TxReady(&hUSB)) {
 			send_to_host();
 		}
-
-		if (can_is_rx_pending(&hCAN)) {
-			struct gs_host_frame *frame = queue_pop_front(q_frame_pool);
-			if (frame != 0)
-			{
-				if (can_receive(&hCAN, frame)) {
-
-					frame->timestamp_us = timer_get();
-					frame->echo_id = 0xFFFFFFFF; // not a echo frame
-					frame->channel = 0;
-					frame->flags = 0;
-					frame->reserved = 0;
-
-					send_to_host_or_enqueue(frame);
-
-					led_indicate_trx(&hLED, led_rx);
-				}
-				else
+		/* loop over all the possible CAN channels looking for a received CAN frame */
+		for (uint8_t chan_index = 0; chan_index < NUM_CAN_CHANNEL; chan_index++) {
+		CAN_HANDLE_TYPEDEF* hCAN_rx = USBD_GS_CAN_GetChannelHandle(&hUSB,chan_index);
+		if (can_is_rx_pending(hCAN_rx)) {
+				struct gs_host_frame *frame = queue_pop_front(q_frame_pool);
+				if (frame != 0)
 				{
-					queue_push_back(q_frame_pool, frame);
+					if (can_receive(hCAN_rx, frame)) {
+						frame->timestamp_us = timer_get();
+						frame->echo_id = 0xFFFFFFFF; // not a echo frame
+						frame->channel = 0;
+						frame->reserved = 0;
+
+						send_to_host_or_enqueue(frame);
+
+						led_indicate_trx(&hLED, led_rx);
+					}
+					else
+					{
+						queue_push_back(q_frame_pool, frame);
+					}
 				}
-			}
-			// If there are frames to receive, don't report any error frames. The
-			// best we can localize the errors to is "after the last successfully
-			// received frame", so wait until we get there. LEC will hold some error
-			// to report even if multiple pass by.
-		} else {
-			uint32_t can_err = can_get_error_status(&hCAN);
-			struct gs_host_frame *frame = queue_pop_front(q_frame_pool);
-			if (frame != 0) {
-				frame->timestamp_us = timer_get();
-				if (can_parse_error_status(can_err, last_can_error_status, &hCAN, frame)) {
-					send_to_host_or_enqueue(frame);
-					last_can_error_status = can_err;
-				} else {
-					queue_push_back(q_frame_pool, frame);
+				// If there are frames to receive, don't report any error frames. The
+				// best we can localize the errors to is "after the last successfully
+				// received frame", so wait until we get there. LEC will hold some error
+				// to report even if multiple pass by.
+			} else {
+				uint32_t can_err = can_get_error_status(hCAN_rx);
+				struct gs_host_frame *frame = queue_pop_front(q_frame_pool);
+				if (frame != 0) {
+					frame->timestamp_us = timer_get();
+					if (can_parse_error_status(can_err, last_can_error_status, hCAN_rx, frame)) {
+						send_to_host_or_enqueue(frame);
+						last_can_error_status = can_err;
+					} else {
+						queue_push_back(q_frame_pool, frame);
+					}
 				}
 			}
 		}
-
+		
 		led_update(&hLED);
 
 		if (USBD_GS_CAN_DfuDetachRequested(&hUSB)) {
