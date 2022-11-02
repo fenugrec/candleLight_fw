@@ -53,7 +53,7 @@ typedef struct {
 	queue_t *q_frame_pool;
 	queue_t *q_from_host;
 
-	struct gs_host_frame *from_host_buf;
+	struct GS_HOST_FRAME *from_host_buf;
 
 	CAN_HANDLE_TYPEDEF *channels[NUM_CAN_CHANNEL];
 
@@ -725,7 +725,11 @@ static uint8_t USBD_GS_CAN_DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum) {
 	USBD_GS_CAN_HandleTypeDef *hcan = (USBD_GS_CAN_HandleTypeDef*)pdev->pClassData;
 
 	uint32_t rxlen = USBD_LL_GetRxDataSize(pdev, epnum);
-	if (rxlen < (sizeof(struct gs_host_frame_classic_can)-4)) {
+#if defined(CANFD_SUPPORT)
+	if (rxlen < (sizeof(struct GS_HOST_FRAME_CLASSIC_CAN)-4)) {
+#else
+	if (rxlen < (sizeof(struct GS_HOST_FRAME)-4)) {
+#endif
 		// Invalid frame length, just ignore it and receive into the same buffer
 		// again next time.
 		USBD_GS_CAN_PrepareReceive(pdev);
@@ -787,19 +791,23 @@ uint8_t USBD_GS_CAN_Transmit(USBD_HandleTypeDef *pdev, uint8_t *buf, uint16_t le
 	}
 }
 
-uint8_t USBD_GS_CAN_SendFrame(USBD_HandleTypeDef *pdev, struct gs_host_frame *frame)
+uint8_t USBD_GS_CAN_SendFrame(USBD_HandleTypeDef *pdev, struct GS_HOST_FRAME *frame)
 {
-	uint8_t buf[sizeof(struct gs_host_frame)],*send_addr;
+	uint8_t buf[sizeof(struct GS_HOST_FRAME)],*send_addr;
 
 	USBD_GS_CAN_HandleTypeDef *hcan = (USBD_GS_CAN_HandleTypeDef*)pdev->pClassData;
 	size_t len = 0;
 
+#if defined (CANFD_SUPPORT)
   if (frame->flags & GS_CAN_FLAG_FD) {
-    len = sizeof(struct gs_host_frame);
+    len = sizeof(struct GS_HOST_FRAME);
   }
   else {
-    len = sizeof(struct gs_host_frame_classic_can);
+    len = sizeof(struct GS_HOST_FRAME_CLASSIC_CAN);
   }
+#else
+  len = sizeof(struct GS_HOST_FRAME);
+#endif
 
 	if (!hcan->timestamps_enabled) {
 		len -= 4;

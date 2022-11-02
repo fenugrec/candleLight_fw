@@ -32,7 +32,6 @@ THE SOFTWARE.
 #include "usbd_def.h"
 #include "queue.h"
 #include "led.h"
-#include "can.h"
 #include "gs_usb.h"
 
 
@@ -50,8 +49,24 @@ THE SOFTWARE.
 #define DFU_INTERFACE_NUM		 1
 #define DFU_INTERFACE_STR_INDEX	 0xE0
 
-extern USBD_ClassTypeDef USBD_GS_CAN;
+/* Create a compile time define to reduce RAM use for non-CANFD codebases */
+#if defined(CANFD_SUPPORT)
+#define GS_HOST_FRAME gs_host_frame
+#define GS_HOST_FRAME_CLASSIC_CAN gs_host_frame_classic_can
+#else
+#define GS_HOST_FRAME gs_host_frame_classic_can
+#endif
 
+/* this exists here to prevent circular dependency with can.h */
+#if defined (STM32F0) || defined (STM32F4)
+#define CAN_HANDLE_TYPEDEF				CAN_HandleTypeDef
+#define CAN_TYPEDEF					CAN_TypeDef
+#elif defined (STM32G0)
+#define CAN_HANDLE_TYPEDEF				FDCAN_HandleTypeDef
+#define CAN_TYPEDEF					FDCAN_GlobalTypeDef
+#endif
+
+extern USBD_ClassTypeDef USBD_GS_CAN;
 
 #if defined(STM32F0)
 # define USB_INTERFACE USB
@@ -84,5 +99,5 @@ bool USBD_GS_CAN_CustomDeviceRequest(USBD_HandleTypeDef *pdev, USBD_SetupReqType
 bool USBD_GS_CAN_CustomInterfaceRequest(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req);
 
 bool USBD_GS_CAN_DfuDetachRequested(USBD_HandleTypeDef *pdev);
-uint8_t USBD_GS_CAN_SendFrame(USBD_HandleTypeDef *pdev, struct gs_host_frame *frame);
+uint8_t USBD_GS_CAN_SendFrame(USBD_HandleTypeDef *pdev, struct GS_HOST_FRAME *frame);
 uint8_t USBD_GS_CAN_Transmit(USBD_HandleTypeDef *pdev, uint8_t *buf, uint16_t len);

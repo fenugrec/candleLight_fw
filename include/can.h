@@ -28,18 +28,10 @@ THE SOFTWARE.
 
 #include <stdint.h>
 #include <stdbool.h>
-
 #include "hal_include.h"
-
 #include "gs_usb.h"
+#include "usbd_gs_can.h"
 
-#if defined (STM32F0) || defined (STM32F4)
-#define CAN_HANDLE_TYPEDEF				CAN_HandleTypeDef
-#define CAN_TYPEDEF					CAN_TypeDef
-#elif defined (STM32G0)
-#define CAN_HANDLE_TYPEDEF				FDCAN_HandleTypeDef
-#define CAN_TYPEDEF					FDCAN_GlobalTypeDef
-#endif
 
 void can_init(CAN_HANDLE_TYPEDEF *hcan, CAN_TYPEDEF *instance);
 bool can_set_bittiming(CAN_HANDLE_TYPEDEF *hcan, uint16_t brp, uint8_t phase_seg1, uint8_t phase_seg2, uint8_t sjw);
@@ -48,10 +40,10 @@ void can_enable(CAN_HANDLE_TYPEDEF *hcan, bool loop_back, bool listen_only, bool
 void can_disable(CAN_HANDLE_TYPEDEF *hcan);
 bool can_is_enabled(CAN_HANDLE_TYPEDEF *hcan);
 
-bool can_receive(CAN_HANDLE_TYPEDEF *hcan, struct gs_host_frame *rx_frame);
+bool can_receive(CAN_HANDLE_TYPEDEF *hcan, struct GS_HOST_FRAME *rx_frame);
 bool can_is_rx_pending(CAN_HANDLE_TYPEDEF *hcan);
 
-bool can_send(CAN_HANDLE_TYPEDEF *hcan, struct gs_host_frame *frame);
+bool can_send(CAN_HANDLE_TYPEDEF *hcan, struct GS_HOST_FRAME *frame);
 
 /** return CAN->ESR register which contains tx/rx error counters and
  * LEC (last error code).
@@ -62,4 +54,4 @@ uint32_t can_get_error_status(CAN_HANDLE_TYPEDEF *hcan);
  * @param frame : will hold the generated error frame
  * @return 1 when status changes (if any) need a new error frame sent
  */
-bool can_parse_error_status(uint32_t err, uint32_t last_err, CAN_HANDLE_TYPEDEF *hcan, struct gs_host_frame *frame);
+bool can_parse_error_status(uint32_t err, uint32_t last_err, CAN_HANDLE_TYPEDEF *hcan, struct GS_HOST_FRAME *frame);

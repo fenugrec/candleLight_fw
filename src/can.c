@@ -306,7 +306,7 @@ bool can_is_rx_pending(CAN_HANDLE_TYPEDEF *hcan)
 #endif
 }
 
-bool can_receive(CAN_HANDLE_TYPEDEF *hcan, struct gs_host_frame *rx_frame)
+bool can_receive(CAN_HANDLE_TYPEDEF *hcan, struct GS_HOST_FRAME *rx_frame)
 {
 #if defined(STM32F0) || defined (STM32F4)
 	CAN_RxHeaderTypeDef RxHeader;
@@ -369,7 +369,7 @@ bool can_receive(CAN_HANDLE_TYPEDEF *hcan, struct gs_host_frame *rx_frame)
 #endif
 }
 
-bool can_send(CAN_HANDLE_TYPEDEF *hcan, struct gs_host_frame *frame)
+bool can_send(CAN_HANDLE_TYPEDEF *hcan, struct GS_HOST_FRAME *frame)
 {
 #if defined(STM32F0) || defined (STM32F4)
 	CAN_TxHeaderTypeDef TxHeader;
@@ -458,7 +458,7 @@ static bool status_is_active(uint32_t err)
 #endif
 }
 
-bool can_parse_error_status(uint32_t err, uint32_t last_err, CAN_HANDLE_TYPEDEF *hcan, struct gs_host_frame *frame)
+bool can_parse_error_status(uint32_t err, uint32_t last_err, CAN_HANDLE_TYPEDEF *hcan, struct GS_HOST_FRAME *frame)
 {
 	/* We build up the detailed error information at the same time as we decide
 	 * whether there's anything worth sending. This variable tracks that final
