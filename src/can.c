@@ -1,26 +1,26 @@
 /*
 
-   The MIT License (MIT)
+	The MIT License (MIT)
 
-   Copyright (c) 2016 Hubert Denkmair
+	Copyright (c) 2016 Hubert Denkmair
 
-   Permission is hereby granted, free of charge, to any person obtaining a copy
-   of this software and associated documentation files (the "Software"), to deal
-   in the Software without restriction, including without limitation the rights
-   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-   copies of the Software, and to permit persons to whom the Software is
-   furnished to do so, subject to the following conditions:
+	Permission is hereby granted, free of charge, to any person obtaining a copy
+	of this software and associated documentation files (the "Software"), to deal
+	in the Software without restriction, including without limitation the rights
+	to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+	copies of the Software, and to permit persons to whom the Software is
+	furnished to do so, subject to the following conditions:
 
-   The above copyright notice and this permission notice shall be included in
-   all copies or substantial portions of the Software.
+	The above copyright notice and this permission notice shall be included in
+	all copies or substantial portions of the Software.
 
-   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-   THE SOFTWARE.
+	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+	IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+	FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+	AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+	LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+	THE SOFTWARE.
 
  */
 
@@ -71,8 +71,8 @@ static void rcc_reset(CAN_TYPEDEF *instance)
 
 #if defined(FDCAN1)
 		UNUSED(instance);
-		//__HAL_RCC_FDCAN_FORCE_RESET();
-		//__HAL_RCC_FDCAN_RELEASE_RESET();
+		__HAL_RCC_FDCAN_FORCE_RESET();
+		__HAL_RCC_FDCAN_RELEASE_RESET();
 #endif
 }
 
@@ -98,23 +98,23 @@ void can_init(CAN_HANDLE_TYPEDEF *hcan, CAN_TYPEDEF *instance)
 #elif defined(STM32G0)
 	RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
 	PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_FDCAN;
-  PeriphClkInit.FdcanClockSelection = RCC_FDCANCLKSOURCE_PCLK1;
+	PeriphClkInit.FdcanClockSelection = RCC_FDCANCLKSOURCE_PCLK1;
 	HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit);
 	__HAL_RCC_FDCAN_CLK_ENABLE();
 	__HAL_RCC_GPIOB_CLK_ENABLE();
 	itd.Pin = GPIO_PIN_9|GPIO_PIN_8;
-    itd.Mode = GPIO_MODE_AF_PP;
-    itd.Pull = GPIO_NOPULL;
-    itd.Speed = GPIO_SPEED_FREQ_LOW;
-    itd.Alternate = GPIO_AF3_FDCAN1;
+	itd.Mode = GPIO_MODE_AF_PP;
+	itd.Pull = GPIO_NOPULL;
+	itd.Speed = GPIO_SPEED_FREQ_LOW;
+	itd.Alternate = GPIO_AF3_FDCAN1;
     HAL_GPIO_Init(GPIOB, &itd);
 #if defined(FDCAN2)
 	itd.Pin = GPIO_PIN_0|GPIO_PIN_1;
-    itd.Mode = GPIO_MODE_AF_PP;
-    itd.Pull = GPIO_NOPULL;
-    itd.Speed = GPIO_SPEED_FREQ_LOW;
-    itd.Alternate = GPIO_AF3_FDCAN2;
-    HAL_GPIO_Init(GPIOB, &itd);
+	itd.Mode = GPIO_MODE_AF_PP;
+	itd.Pull = GPIO_NOPULL;
+	itd.Speed = GPIO_SPEED_FREQ_LOW;
+	itd.Alternate = GPIO_AF3_FDCAN2;
+	HAL_GPIO_Init(GPIOB, &itd);
 #endif
 #endif
 
@@ -122,17 +122,23 @@ void can_init(CAN_HANDLE_TYPEDEF *hcan, CAN_TYPEDEF *instance)
 #if defined(STM32F0) || defined(STM32F4)
 	hcan->Instance = instance;
 	hcan->Init.TimeTriggeredMode = DISABLE;
-	hcan->Init.AutoBusOff = DISABLE;
+	hcan->Init.AutoBusOff = ENABLE;
 	hcan->Init.AutoWakeUp = DISABLE;
 	hcan->Init.AutoRetransmission = ENABLE;
 	hcan->Init.ReceiveFifoLocked = DISABLE;
-	hcan->Init.TransmitFifoPriority = DISABLE;
+	hcan->Init.TransmitFifoPriority = ENABLE;
 	hcan->Init.Mode = CAN_MODE_NORMAL;
-	hcan->Init.SyncJumpWidth = 1;
-	hcan->Init.TimeSeg1 = 13;
-	hcan->Init.TimeSeg2 = 2;
-	hcan->Init.Prescaler = 6;
 
+	/* all values for the bxCAN init are -1 and shifted */
+	hcan->Init.SyncJumpWidth = ((1)-1) << CAN_BTR_SJW_Pos;
+	hcan->Init.Prescaler = ((6)-1);
+#if defined(STM32F4)
+	hcan->Init.TimeSeg1 = ((12)-1) << CAN_BTR_TS1_Pos;
+	hcan->Init.TimeSeg2 = ((1)-1) << CAN_BTR_TS2_Pos;
+#else
+	hcan->Init.TimeSeg1 = ((13)-1) << CAN_BTR_TS1_Pos;
+	hcan->Init.TimeSeg2 = ((2)-1) << CAN_BTR_TS2_Pos;
+#endif
 	HAL_CAN_Init(hcan);
 
 #elif defined(STM32G0)
@@ -160,21 +166,20 @@ void can_init(CAN_HANDLE_TYPEDEF *hcan, CAN_TYPEDEF *instance)
 
 bool can_set_bittiming(CAN_HANDLE_TYPEDEF *hcan, uint16_t brp, uint8_t phase_seg1, uint8_t phase_seg2, uint8_t sjw)
 {
-	if (  (brp>0) && (brp<=1024)
-	   && (phase_seg1>0) && (phase_seg1<=16)
-	   && (phase_seg2>0) && (phase_seg2<=8)
-	   && (sjw>0) && (sjw<=4)
-		  ) {
-
+	if ((brp>0) && (brp<=1024)
+		&& (phase_seg1>0) && (phase_seg1<=16)
+		&& (phase_seg2>0) && (phase_seg2<=8)
+		&& (sjw>0) && (sjw<=4)
+	) {
 #if defined(STM32G0)
 		hcan->Init.NominalPrescaler = brp;
 		hcan->Init.NominalTimeSeg1 = phase_seg1;
 		hcan->Init.NominalTimeSeg2 = phase_seg2;
 		hcan->Init.NominalSyncJumpWidth = sjw;
 #else
-		hcan->Init.SyncJumpWidth = sjw;
-		hcan->Init.TimeSeg1 = phase_seg1;
-		hcan->Init.TimeSeg2 = phase_seg2;
+		hcan->Init.SyncJumpWidth = (sjw-1) << CAN_BTR_SJW_Pos;
+		hcan->Init.TimeSeg1 = (phase_seg1-1) << CAN_BTR_TS1_Pos;
+		hcan->Init.TimeSeg2 = (phase_seg2-1) << CAN_BTR_TS2_Pos;;
 		hcan->Init.Prescaler = brp;
 #endif
 		return true;
@@ -186,11 +191,11 @@ bool can_set_bittiming(CAN_HANDLE_TYPEDEF *hcan, uint16_t brp, uint8_t phase_seg
 bool can_set_data_bittiming(CAN_HANDLE_TYPEDEF *hcan, uint16_t brp, uint8_t phase_seg1, uint8_t phase_seg2, uint8_t sjw)
 {
 
-	if (  (brp>0) && (brp<=1024)
-	   && (phase_seg1>0) && (phase_seg1<=16)
-	   && (phase_seg2>0) && (phase_seg2<=8)
-	   && (sjw>0) && (sjw<=4)
-		  ) {
+	if ((brp>0) && (brp<=1024)
+		&& (phase_seg1>0) && (phase_seg1<=16)
+		&& (phase_seg2>0) && (phase_seg2<=8)
+		&& (sjw>0) && (sjw<=4)
+	) {
 #if defined(STM32G0)
 		hcan->Init.DataPrescaler = brp;
 		hcan->Init.DataTimeSeg1 = phase_seg1;
@@ -210,14 +215,16 @@ bool can_set_data_bittiming(CAN_HANDLE_TYPEDEF *hcan, uint16_t brp, uint8_t phas
 
 void can_enable(CAN_HANDLE_TYPEDEF *hcan, bool loop_back, bool listen_only, bool one_shot, bool can_mode_fd)
 {
+	// Completely reset before reinitializing the bus
+	rcc_reset(hcan->Instance);
+
 #if defined(STM32F0) || defined (STM32F4)
 	UNUSED(can_mode_fd);
-	rcc_reset(hcan->Instance);
 	hcan->Init.AutoRetransmission = one_shot ? DISABLE : ENABLE;
 	hcan->Init.Mode = CAN_MODE_NORMAL;
 	if (listen_only) hcan->Init.Mode |= CAN_MODE_SILENT;
 	if (loop_back) hcan->Init.Mode |= CAN_MODE_LOOPBACK;
-
+	
 	HAL_CAN_Init(hcan);
 
 	// Configure reception filter to Rx FIFO 0
@@ -233,12 +240,9 @@ void can_enable(CAN_HANDLE_TYPEDEF *hcan, bool loop_back, bool listen_only, bool
 	sFilterConfig.FilterActivation = ENABLE;
 	sFilterConfig.SlaveStartFilterBank = 14;
 	HAL_CAN_ConfigFilter(hcan, &sFilterConfig);
-
-	// Completely reset while being off the bus
-	rcc_reset(hcan->Instance);
+	
 	// Start CAN using HAL
 	HAL_CAN_Start(hcan);
-
 
 #elif defined(STM32G0)
 	hcan->Init.AutoRetransmission = one_shot ? DISABLE : ENABLE;
@@ -291,9 +295,9 @@ void can_disable(CAN_HANDLE_TYPEDEF *hcan)
 bool can_is_enabled(CAN_HANDLE_TYPEDEF *hcan)
 {
 #if defined(STM32F0) || defined (STM32F4)
-	return hcan->State != HAL_CAN_STATE_RESET;
+	return hcan->State == HAL_CAN_STATE_LISTENING;
 #elif defined(STM32G0)
-	return hcan->State != HAL_FDCAN_STATE_RESET;
+	return hcan->State == HAL_FDCAN_STATE_BUSY;
 #endif
 }
 
@@ -309,7 +313,7 @@ bool can_is_rx_pending(CAN_HANDLE_TYPEDEF *hcan)
 bool can_receive(CAN_HANDLE_TYPEDEF *hcan, struct GS_HOST_FRAME *rx_frame)
 {
 #if defined(STM32F0) || defined (STM32F4)
-	CAN_RxHeaderTypeDef RxHeader;
+  CAN_RxHeaderTypeDef RxHeader;
 
 	/* Get RX message */
 	if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &RxHeader, can_rx_data_buff) != HAL_OK)
@@ -372,7 +376,7 @@ bool can_receive(CAN_HANDLE_TYPEDEF *hcan, struct GS_HOST_FRAME *rx_frame)
 bool can_send(CAN_HANDLE_TYPEDEF *hcan, struct GS_HOST_FRAME *frame)
 {
 #if defined(STM32F0) || defined (STM32F4)
-	CAN_TxHeaderTypeDef TxHeader;
+  CAN_TxHeaderTypeDef TxHeader;
 
 	TxHeader.StdId = frame->can_id & 0x7FF;
 	TxHeader.ExtId = frame->can_id & 0x1FFFFFFF;
@@ -522,34 +526,34 @@ bool can_parse_error_status(uint32_t err, uint32_t last_err, CAN_HANDLE_TYPEDEF 
 
 	uint8_t lec = (err>>4) & 0x07;
 #elif defined(STM32G0)
-  if (err & FDCAN_PSR_BO) {
-    if (!(last_err & FDCAN_PSR_BO)) {
-      /* We transitioned to bus-off. */
-      frame->can_id |= CAN_ERR_BUSOFF;
-      should_send = true;
-    }
-  }
+	if (err & FDCAN_PSR_BO) {
+		if (!(last_err & FDCAN_PSR_BO)) {
+			/* We transitioned to bus-off. */
+			frame->can_id |= CAN_ERR_BUSOFF;
+			should_send = true;
+		}
+	}
 
-  /* The Linux sja1000 driver puts these counters here. Seems like as good a
-   * place as any. */
-  // TX error count
-  frame->classic_can.data[6] = ((hcan->Instance->ECR & FDCAN_ECR_TEC) >> FDCAN_ECR_TEC_Pos);
-  // RX error count
-  frame->classic_can.data[7] = ((hcan->Instance->ECR & FDCAN_ECR_REC) >> FDCAN_ECR_REC_Pos);
+	/* The Linux sja1000 driver puts these counters here. Seems like as good a
+	* place as any. */
+	// TX error count
+	frame->classic_can.data[6] = ((hcan->Instance->ECR & FDCAN_ECR_TEC) >> FDCAN_ECR_TEC_Pos);
+	// RX error count
+	frame->classic_can.data[7] = ((hcan->Instance->ECR & FDCAN_ECR_REC) >> FDCAN_ECR_REC_Pos);
 
-  if (err & FDCAN_PSR_EP) {
-    if (!(last_err & FDCAN_PSR_EP)) {
-      frame->can_id |= CAN_ERR_CRTL;
-      frame->classic_can.data[1] |= CAN_ERR_CRTL_RX_PASSIVE | CAN_ERR_CRTL_TX_PASSIVE;
-      should_send = true;
-    }
-  } else if (err & FDCAN_PSR_EW) {
-    if (!(last_err & FDCAN_PSR_EW)) {
-      frame->can_id |= CAN_ERR_CRTL;
-      frame->classic_can.data[1] |= CAN_ERR_CRTL_RX_WARNING | CAN_ERR_CRTL_TX_WARNING;
-      should_send = true;
-    }
-  }
+	if (err & FDCAN_PSR_EP) {
+	if (!(last_err & FDCAN_PSR_EP)) {
+		frame->can_id |= CAN_ERR_CRTL;
+		frame->classic_can.data[1] |= CAN_ERR_CRTL_RX_PASSIVE | CAN_ERR_CRTL_TX_PASSIVE;
+		should_send = true;
+	}
+	} else if (err & FDCAN_PSR_EW) {
+	if (!(last_err & FDCAN_PSR_EW)) {
+		frame->can_id |= CAN_ERR_CRTL;
+		frame->classic_can.data[1] |= CAN_ERR_CRTL_RX_WARNING | CAN_ERR_CRTL_TX_WARNING;
+		should_send = true;
+	}
+	}
 
   uint8_t lec = err & FDCAN_PSR_LEC;
 #endif
