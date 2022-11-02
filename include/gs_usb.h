@@ -280,32 +280,42 @@ struct gs_device_termination_state {
 	u32 state;
 } __packed;
 
+struct classic_can {
+  u8 data[8];
+} __attribute__((packed));
+
+struct canfd {
+  u8 data[64];
+} __attribute__((packed));
+
 struct gs_host_frame {
-	u32 echo_id;
-	u32 can_id;
+  u32 echo_id;
+  u32 can_id;
 
-	u8 can_dlc;
-	u8 channel;
-	u8 flags;
-	u8 reserved;
+  u8 can_dlc;
+  u8 channel;
+  u8 flags;
+  u8 reserved;
 
-	u8 data[8];
+  union {
+    struct classic_can classic_can;
+    struct canfd canfd;
+  };
+  u32 timestamp_us;
+} __attribute__((packed));
 
-	u32 timestamp_us;
+struct gs_host_frame_classic_can {
+  u32 echo_id;
+  u32 can_id;
 
-} __packed;
+  u8 can_dlc;
+  u8 channel;
+  u8 flags;
+  u8 reserved;
 
-struct gs_host_frame_canfd {
-	u32 echo_id;
-	u32 can_id;
-
-	u8 can_dlc;
-	u8 channel;
-	u8 flags;
-	u8 reserved;
-
-	u8 data[64];
-} __packed;
+  struct classic_can classic_can;
+  u32 timestamp_us;
+} __attribute__((packed));
 
 struct gs_tx_context {
 	struct gs_can *dev;
