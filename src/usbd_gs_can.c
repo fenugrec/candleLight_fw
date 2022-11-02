@@ -300,7 +300,8 @@ static const struct gs_device_bt_const USBD_GS_CAN_btconst = {
 
 uint8_t USBD_GS_CAN_Init(USBD_HandleTypeDef *pdev, queue_t *q_frame_pool, queue_t *q_from_host, led_data_t *leds)
 {
-	USBD_GS_CAN_HandleTypeDef *hcan = calloc(1, sizeof(USBD_GS_CAN_HandleTypeDef));
+	static uint32_t mem[(sizeof(USBD_GS_CAN_HandleTypeDef)/4)+1] = {0}; /* On 32-bit boundary */
+	USBD_GS_CAN_HandleTypeDef *hcan = (USBD_GS_CAN_HandleTypeDef*)&mem;
 
 	assert_basic(hcan);
 

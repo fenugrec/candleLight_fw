@@ -91,8 +91,8 @@ int main(void)
 	q_to_host    = queue_create(CAN_QUEUE_SIZE);
 	assert_basic(q_frame_pool && q_from_host && q_to_host);
 
-	struct gs_host_frame *msgbuf = calloc(CAN_QUEUE_SIZE, sizeof(struct gs_host_frame));
-	assert_basic(msgbuf);
+	/* Reserve a memory pool for the queue */
+	static struct gs_host_frame msgbuf[CAN_QUEUE_SIZE] = {0};
 
 	for (unsigned i=0; i<CAN_QUEUE_SIZE; i++) {
 		queue_push_back(q_frame_pool, &msgbuf[i]);
